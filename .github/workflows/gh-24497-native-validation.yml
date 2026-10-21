@@ -1,0 +1,38 @@
+name: GH-24497 native PHPT validation
+on:
+  push:
+    branches: [ci-gh-24497-validation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-php82-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf bison re2c pkg-config libxml2-dev libsqlite3-dev
+      - name: Checkout exact patch commit
+        run: |
+          git clone --depth=1 --branch fix-gh-24497-memory-hard-limit-default https://github.com/theworker02/php-src-patch.git php-src
+          test "$(git -C php-src rev-parse HEAD)" = "b39b315b856d840a5297e3e1bad341ec211cbdaa"
+      - name: Build PHP 8.2 CLI from proposed patch
+        run: |
+          cd php-src
+          ./buildconf --force
+          ./configure --disable-all --enable-cli --enable-debug
+          make -j2
+          sapi/cli/php -v
+      - name: Run two PHPT regression tests
+        env:
+          REPORT_EXIT_STATUS: "1"
+        run: |
+          cd php-src
+          sapi/cli/php run-tests.php -q Zend/tests/memory_hard_limit_percent_default.phpt Zend/tests/memory_hard_limit_percent_override.phpt
+      - name: Verify automatic configuration
+        run: |
+          php-src/sapi/cli/php -n -r 'exit(ini_get("memory_hard_limit_percent") === "-1" ? 0 : 1);'
