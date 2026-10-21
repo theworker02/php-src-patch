@@ -1,0 +1,40 @@
+name: GH-24497 native PHP verification
+
+on:
+  push:
+    branches: [ci-verify-gh-24497]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php82-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show patch revision and test inputs
+        run: |
+          git log -2 --oneline
+          test -f Zend/tests/memory_hard_limit_percent_default.phpt
+          test -f Zend/tests/memory_hard_limit_percent_override.phpt
+          grep -F 'PHP_INI_ENTRY("memory_hard_limit_percent",' main/main.c
+      - name: Install PHP build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf bison re2c pkg-config libxml2-dev libsqlite3-dev
+      - name: Build patched PHP 8.2 CLI
+        run: |
+          ./buildconf --force
+          ./configure --disable-all --enable-cli --enable-debug
+          make -j2
+          sapi/cli/php -v
+      - name: Run upstream PHPT regression tests
+        run: |
+          sapi/cli/php run-tests.php -q \
+            Zend/tests/memory_hard_limit_percent_default.phpt \
+            Zend/tests/memory_hard_limit_percent_override.phpt
+      - name: Assert fixed INI default
+        run: |
+          sapi/cli/php -n -r 'exit(ini_get("memory_hard_limit_percent") === "-1" ? 0 : 1);'
