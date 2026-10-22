@@ -819,15 +819,25 @@ static struct php_gfxinfo *php_handle_tiff (php_stream * stream, zval *info, int
 			case TAG_FMT_USHORT:
 				entry_value  = php_ifd_get16u(dir_entry+8, motorola_intel);
 				break;
-			case TAG_FMT_SSHORT:
-				entry_value  = php_ifd_get16s(dir_entry+8, motorola_intel);
+			case TAG_FMT_SSHORT: {
+				signed short signed_value = php_ifd_get16s(dir_entry+8, motorola_intel);
+				if (signed_value < 0) {
+					continue;
+				}
+				entry_value = (size_t) signed_value;
 				break;
+			}
 			case TAG_FMT_ULONG:
 				entry_value  = php_ifd_get32u(dir_entry+8, motorola_intel);
 				break;
-			case TAG_FMT_SLONG:
-				entry_value  = php_ifd_get32s(dir_entry+8, motorola_intel);
+			case TAG_FMT_SLONG: {
+				int signed_value = php_ifd_get32s(dir_entry+8, motorola_intel);
+				if (signed_value < 0) {
+					continue;
+				}
+				entry_value = (size_t) signed_value;
 				break;
+			}
 			default:
 				continue;
 		}
